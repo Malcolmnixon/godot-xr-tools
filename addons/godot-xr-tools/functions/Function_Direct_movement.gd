@@ -20,6 +20,8 @@ export var step_turn_angle = 20.0
 # and movement
 export var max_speed = 10.0
 export var drag_factor = 0.1
+export var air_drag_factor := 0.01
+export var max_slope := 45.0
 
 # enum our buttons, should find a way to put this more central
 enum Buttons {
@@ -46,6 +48,7 @@ export var canFly = true
 export (Buttons) var fly_move_button_id = Buttons.VR_TRIGGER
 export (Buttons) var fly_activate_button_id = Buttons.VR_GRIP
 var isflying = false
+var is_on_ground = true
 
 var turn_step = 0.0
 var origin_node = null
@@ -53,7 +56,6 @@ var camera_node = null
 var velocity = Vector3(0.0, 0.0, 0.0)
 var gravity = -9.8
 onready var collision_shape: CollisionShape = get_node("KinematicBody/CollisionShape")
-onready var tail : RayCast = get_node("KinematicBody/Tail")
 
 # Set our collision layer
 export  (int, LAYERS_3D_PHYSICS) var collision_layer = 1 << 19 setget set_collision_layer, get_collision_layer
@@ -66,8 +68,6 @@ func set_enabled(new_value):
 	enabled = new_value
 	if collision_shape:
 		collision_shape.disabled = !enabled
-	if tail:
-		tail.enabled = enabled
 	if enabled:
 		# make sure our physics process is on
 		set_physics_process(true)
@@ -90,7 +90,6 @@ func set_collision_mask(new_mask):
 	collision_mask = new_mask
 	if $KinematicBody:
 		$KinematicBody.collision_mask = collision_mask
-		$KinematicBody/Tail.collision_mask = collision_mask
 
 func get_collision_mask():
 	return collision_mask
@@ -117,7 +116,6 @@ func _ready():
 	set_player_radius(player_radius)
 
 	collision_shape.disabled = !enabled
-	tail.enabled = enabled
 
 func _physics_process(delta):
 	if !origin_node:
@@ -235,21 +233,27 @@ func _physics_process(delta):
 
 			$KinematicBody.global_transform = curr_transform
 
+			# Test if the player is on the ground
+			is_on_ground = _is_on_ground()
+
 			# we'll handle gravity separately
 			var gravity_velocity = Vector3(0.0, velocity.y, 0.0)
 			velocity.y = 0.0
 
 			# Apply our drag
-			velocity *= (1.0 - drag_factor)
+			if is_on_ground:
+				velocity *= (1.0 - drag_factor)
+			else:
+				velocity *= (1.0 - air_drag_factor)
 
 			if move_type == MOVEMENT_TYPE.MOVE_AND_ROTATE:
-				if (abs(forwards_backwards) > 0.1 and tail.is_colliding()):
+				if (abs(forwards_backwards) > 0.1 and is_on_ground):
 					var dir = camera_transform.basis.z
 					dir.y = 0.0
 					velocity = dir.normalized() * -forwards_backwards * max_speed * ARVRServer.world_scale
 					#velocity = velocity.linear_interpolate(dir, delta * 100.0)
 			elif move_type == MOVEMENT_TYPE.MOVE_AND_STRAFE:
-				if ((abs(forwards_backwards) > 0.1 ||  abs(left_right) > 0.1) and tail.is_colliding()):
+				if ((abs(forwards_backwards) > 0.1 ||  abs(left_right) > 0.1) and is_on_ground):
 					var dir_forward = camera_transform.basis.z
 					dir_forward.y = 0.0
 					# VR Capsule will strafe left and right
@@ -271,3 +275,18 @@ func _physics_process(delta):
 
 			# Return this back to where it was so we can use its collision shape for other things too
 			# $KinematicBody.global_transform.origin = curr_transform.origin
+
+func _is_on_ground():
+	# Test casting the player body down 0.05 meters (just a test, no actual movement)
+	var ground_collision = $KinematicBody.move_and_collide(Vector3(0.0, -0.05, 0.0), true, true, true)
+	if !ground_collision:
+		return false
+
+	# Calculate the collision vector (the normal at the players lower-sphere)
+	var body_at_collision = $KinematicBody.global_transform.origin + ground_collision.travel
+	body_at_collision.y += player_radius
+	var collision_vector = ground_collision.position - body_at_collision
+	
+	# Test if the object we're colliding with is considered a ground for us
+	var ground_slope = collision_vector.angle_to(Vector3(0.0, -1.0, 0.0)) * 57.2957795131
+	return ground_slope < max_slope
