@@ -1,5 +1,12 @@
 extends Node
 
+# State of the ground under the player
+enum GROUND_STATE {
+	 AIR,		# No ground under player
+	 GROUND,	# Usable ground under player
+	 SLOPE		# Steep slope under player
+}
+
 enum MOVEMENT_TYPE { MOVE_AND_ROTATE, MOVE_AND_STRAFE }
 
 # Is this active?
@@ -20,7 +27,6 @@ export var step_turn_angle = 20.0
 # and movement
 export var max_speed = 10.0
 export var drag_factor = 0.1
-export var air_drag_factor := 0.01
 export var max_slope := 45.0
 
 # enum our buttons, should find a way to put this more central
@@ -48,7 +54,8 @@ export var canFly = true
 export (Buttons) var fly_move_button_id = Buttons.VR_TRIGGER
 export (Buttons) var fly_activate_button_id = Buttons.VR_GRIP
 var isflying = false
-var is_on_ground = true
+var ground_state = GROUND_STATE.GROUND
+var ground_vector = Vector3.UP
 
 var turn_step = 0.0
 var origin_node = null
@@ -233,27 +240,27 @@ func _physics_process(delta):
 
 			$KinematicBody.global_transform = curr_transform
 
-			# Test if the player is on the ground
-			is_on_ground = _is_on_ground()
+			# Test the state of the ground under the player
+			_update_ground_state()
 
 			# we'll handle gravity separately
 			var gravity_velocity = Vector3(0.0, velocity.y, 0.0)
 			velocity.y = 0.0
-
-			# Apply our drag
-			if is_on_ground:
+			
+			# If the player isn't in the air then apply ground-drag
+			if ground_state != GROUND_STATE.AIR:
 				velocity *= (1.0 - drag_factor)
-			else:
-				velocity *= (1.0 - air_drag_factor)
 
+			# Apply movement control
+			var can_control = ground_state != GROUND_STATE.AIR
 			if move_type == MOVEMENT_TYPE.MOVE_AND_ROTATE:
-				if (abs(forwards_backwards) > 0.1 and is_on_ground):
+				if (abs(forwards_backwards) > 0.1 and can_control):
 					var dir = camera_transform.basis.z
 					dir.y = 0.0
 					velocity = dir.normalized() * -forwards_backwards * max_speed * ARVRServer.world_scale
 					#velocity = velocity.linear_interpolate(dir, delta * 100.0)
 			elif move_type == MOVEMENT_TYPE.MOVE_AND_STRAFE:
-				if ((abs(forwards_backwards) > 0.1 ||  abs(left_right) > 0.1) and is_on_ground):
+				if ((abs(forwards_backwards) > 0.1 ||  abs(left_right) > 0.1) and can_control):
 					var dir_forward = camera_transform.basis.z
 					dir_forward.y = 0.0
 					# VR Capsule will strafe left and right
@@ -261,6 +268,10 @@ func _physics_process(delta):
 					dir_right.y = 0.0
 					velocity = (dir_forward * -forwards_backwards + dir_right * left_right).normalized() * max_speed * ARVRServer.world_scale
 
+			# If the player is on a steep slope then prevent 'up' movements
+			if ground_state == GROUND_STATE.SLOPE:
+				velocity = _clamp_move_velocity(velocity)
+				
 			# apply move and slide to our kinematic body
 			velocity = $KinematicBody.move_and_slide(velocity, Vector3(0.0, 1.0, 0.0))
 
@@ -276,17 +287,36 @@ func _physics_process(delta):
 			# Return this back to where it was so we can use its collision shape for other things too
 			# $KinematicBody.global_transform.origin = curr_transform.origin
 
-func _is_on_ground():
+# This function updates the ground_state and ground_vector member variables
+func _update_ground_state():
 	# Test casting the player body down 0.05 meters (just a test, no actual movement)
 	var ground_collision = $KinematicBody.move_and_collide(Vector3(0.0, -0.05, 0.0), true, true, true)
 	if !ground_collision:
-		return false
-
-	# Calculate the collision vector (the normal at the players lower-sphere)
-	var body_at_collision = $KinematicBody.global_transform.origin + ground_collision.travel
-	body_at_collision.y += player_radius
-	var collision_vector = ground_collision.position - body_at_collision
+		# Player is in air
+		ground_vector = Vector3.UP
+		ground_state = GROUND_STATE.AIR
+		return
 	
-	# Test if the object we're colliding with is considered a ground for us
-	var ground_slope = collision_vector.angle_to(Vector3(0.0, -1.0, 0.0)) * 57.2957795131
-	return ground_slope < max_slope
+	# Save the ground vector
+	ground_vector = ground_collision.normal
+	
+	# Analyze the ground slope
+	var ground_slope = ground_collision.get_angle() * 57.2957795131
+	if ground_slope > max_slope:
+		# Steep ground detected
+		ground_state = GROUND_STATE.SLOPE
+	else:
+		# Normal ground detected
+		ground_state = GROUND_STATE.GROUND
+
+# This function clamps the given velocity to be in the 'down' direction of the ground slope
+func _clamp_move_velocity(velocity):
+	# Calculate the downwards direction
+	var down_direction = Vector3(ground_vector.x, 0.0, ground_vector.z).normalized()
+	
+	# Check if the velocity2has some 'up' component
+	var vdot = down_direction.dot(velocity)
+	if vdot < 0:
+		velocity -= down_direction * vdot
+	
+	return velocity
