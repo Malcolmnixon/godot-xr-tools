@@ -59,8 +59,8 @@ func _ready():
 	_right_controller_node = get_node(right_controller) if right_controller else get_node("../RightHandController")
 
 func physics_movement(delta: float, player_body: PlayerBody):
-	# Skip if not enabled or the player isn't on the ground
-	if !enabled or !player_body.on_ground:
+	# Skip if not enabled or the player is on the ground
+	if !enabled or player_body.on_ground:
 		return
 
 	# Skip if either controller is off
