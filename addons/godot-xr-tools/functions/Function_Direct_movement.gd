@@ -28,26 +28,23 @@ extends MovementProvider
 
 enum MOVEMENT_TYPE { MOVE_AND_ROTATE, MOVE_AND_STRAFE }
 
-## Enable direct movement
-export var enabled := true
-
-## Motion provider order
+## Movement provider order
 export var order := 10
 
 ## Use smooth rotation (may cause motion sickness)
-export var smooth_rotation = false
+export var smooth_rotation := false
 
 ## Smooth turn speed in radians per second
-export var smooth_turn_speed = 2.0
+export var smooth_turn_speed := 2.0
 
 ## Seconds per step (at maximum turn rate)
-export var step_turn_delay = 0.2
+export var step_turn_delay := 0.2
 
 ## Step turn angle in degrees
-export var step_turn_angle = 20.0
+export var step_turn_angle := 20.0
 
 ## Movement speed
-export var max_speed = 10.0
+export var max_speed := 10.0
 
 # enum our buttons, should find a way to put this more central
 enum Buttons {
@@ -72,7 +69,7 @@ enum Buttons {
 export (MOVEMENT_TYPE) var move_type = MOVEMENT_TYPE.MOVE_AND_ROTATE
 
 ## Can Fly flag
-export var canFly = true
+export var canFly := true
 
 ## Flight movement button (moves in controller direction if flight active)
 export (Buttons) var fly_move_button_id = Buttons.VR_TRIGGER
@@ -96,8 +93,8 @@ func _ready():
 
 # Perform jump movement
 func physics_movement(delta: float, player_body: PlayerBody):
-	# Skip if not enabled or the controller isn't active
-	if !enabled or !_controller_node.get_is_active():
+	# Skip if the controller isn't active
+	if !_controller_node.get_is_active():
 		return
 
 	# Handle rotation
@@ -108,8 +105,8 @@ func physics_movement(delta: float, player_body: PlayerBody):
 	if canFly and _controller_node.is_button_pressed(fly_activate_button_id):
 		if _controller_node.is_button_pressed(fly_move_button_id):
 			# Use the controller's transform to move the VR capsule follow its orientation
-			var curr_transform = player_body.kinematic_node.global_transform
-			var fly_velocity = -_controller_node.global_transform.basis.z.normalized() * max_speed * ARVRServer.world_scale
+			var curr_transform := player_body.kinematic_node.global_transform
+			var fly_velocity := -_controller_node.global_transform.basis.z.normalized() * max_speed * ARVRServer.world_scale
 			player_body.velocity = player_body.kinematic_node.move_and_slide(fly_velocity)
 		else:
 			player_body.velocity = Vector3.ZERO
@@ -130,7 +127,7 @@ func physics_movement(delta: float, player_body: PlayerBody):
 
 # Perform rotation based on the players rotation controller input
 func _perform_player_rotation(delta: float, player_body: PlayerBody):
-	var left_right = _controller_node.get_joystick_axis(0)
+	var left_right := _controller_node.get_joystick_axis(0)
 	
 	if abs(left_right) <= 0.1:
 		# Not turning
@@ -150,7 +147,7 @@ func _perform_player_rotation(delta: float, player_body: PlayerBody):
 	_turn_step += left_right * delta
 
 	# Calculate how many steps to perform (if any)
-	var steps = int(_turn_step / step_turn_delay)
+	var steps := int(_turn_step / step_turn_delay)
 	if steps != 0:
 		# Apply the rotation
 		var step_angle = steps * step_turn_angle
@@ -161,9 +158,9 @@ func _perform_player_rotation(delta: float, player_body: PlayerBody):
 
 # Rotate the origin node around the camera
 func _rotate_player(player_body: PlayerBody, angle: float):
-	var t1 = Transform()
-	var t2 = Transform()
-	var rot = Transform()
+	var t1 := Transform()
+	var t2 := Transform()
+	var rot := Transform()
 
 	t1.origin = -player_body.camera_node.transform.origin
 	t2.origin = player_body.camera_node.transform.origin

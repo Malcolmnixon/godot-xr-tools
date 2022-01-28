@@ -19,20 +19,23 @@ extends MovementProvider
 ##     desired.
 ##
 
-## Enable direct movement
-export var enabled := true
+## Signal invoked when the player starts climing
+signal player_climb_start
 
-## Motion provider order
+## Signal invoked when the player ends climbing
+signal player_climb_end
+
+## Movement provider order
 export var order := 15
 
 ## Push forward when flinging
 export var forward_push := 1.0
 
 ## Velocity multiplier when flinging up walls
-export var fling_multiplier := 1
+export var fling_multiplier := 1.0
 
 ## Averages for velocity measurement
-export var velocity_averages = 5
+export var velocity_averages := 5
 
 ## Pickup function for the left hand
 export (NodePath) var left_pickup = null
@@ -69,46 +72,44 @@ func physics_movement(delta: float, player_body: PlayerBody):
 	var right_climbable = _right_pickup_node.picked_up_object
 	if right_climbable and !right_climbable is Object_climbable:
 		right_climbable = null
-	
+
 	# Detect if we are climbing now
-	var old_is_climbing = is_climbing
+	var old_is_climbing := is_climbing
 	is_climbing = left_climbable or right_climbable
-	
+
 	# Skip if no current or previous climbing
 	if !is_climbing and !old_is_climbing:
 		return
-	
-	# Detect start of climbing by clearing the velocity-averaging data
+
+	# Detect change of climbing state
 	if !old_is_climbing:
 		_distances.clear()
 		_deltas.clear()
-
-	# Detect end of climbing and set player velocity
-	if !is_climbing:
-		var velocity = _average_velocity()
+		emit_signal("player_climb_start")
+	elif !is_climbing:
+		var velocity := _average_velocity()
 		var dir_forward = -(player_body.camera_node.global_transform.basis.z * horizontal).normalized()
-		player_body.velocity = velocity * fling_multiplier + dir_forward * forward_push
+		player_body.velocity = (velocity * fling_multiplier) + (dir_forward * forward_push)
+		emit_signal("player_climb_end")
 		return
 
 	# Calculate how much the player has moved
-	var offset = Vector3.ZERO
-	var count = 0
+	var offset := Vector3.ZERO
 	if left_climbable:
 		offset += _left_pickup_node.global_transform.origin - left_climbable.get_grab_location(_left_pickup_node)
-		count += 1
 	if right_climbable:
 		offset += _right_pickup_node.global_transform.origin - right_climbable.get_grab_location(_right_pickup_node)
-		count += 1
 
 	# Average the offset if we have two hands moving
-	offset /= count
+	if left_climbable and right_climbable:
+		offset *= 0.5
 
 	# Move the player by the offset
-	var old_position = player_body.kinematic_node.global_transform.origin
+	var old_position := player_body.kinematic_node.global_transform.origin
 	player_body.kinematic_node.move_and_collide(-offset)
 
 	# Update the players average-velocity data
-	var distance = player_body.kinematic_node.global_transform.origin - old_position
+	var distance := player_body.kinematic_node.global_transform.origin - old_position
 	_update_velocity(delta, distance)
 
 	# Report exclusive motion performed (to bypass gravity)
@@ -126,14 +127,14 @@ func _update_velocity(delta: float, distance: Vector3):
 # Calculate average player velocity
 func _average_velocity() -> Vector3:
 	# Calculate the total time
-	var total_time = 0.0
-	for d in _deltas:
-		total_time += d
+	var total_time := 0.0
+	for dt in _deltas:
+		total_time += dt
 
 	# Calculate the total distance
-	var total_distance = Vector3(0.0, 0.0, 0.0)
-	for d in _distances:
-		total_distance += d
+	var total_distance := Vector3(0.0, 0.0, 0.0)
+	for dd in _distances:
+		total_distance += dd
 
 	# Return the average
 	return total_distance / total_time
@@ -141,12 +142,12 @@ func _average_velocity() -> Vector3:
 # This method verifies the MovementProvider has a valid configuration.
 func _get_configuration_warning():
 	# Verify the left controller
-	var test_left_pickup_node = get_node(left_pickup)
+	var test_left_pickup_node = get_node_or_null(left_pickup) if left_pickup else null
 	if !test_left_pickup_node or !test_left_pickup_node is Function_Pickup:
 		return "Unable to find left Function_Pickup"
 
 	# Verify the right controller
-	var test_right_pickup_node = get_node(right_pickup)
+	var test_right_pickup_node = get_node_or_null(right_pickup) if right_pickup else null
 	if !test_right_pickup_node or !test_right_pickup_node is Function_Pickup:
 		return "Unable to find right Function_Pickup"
 

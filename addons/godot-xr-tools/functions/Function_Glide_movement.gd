@@ -21,17 +21,20 @@ extends MovementProvider
 ##     after any Direct movement providers responsible for turning.
 ##
 
-## Enable glide movement
-export var enabled := true
+## Signal invoked when the player starts gliding
+signal player_glide_start
 
-## Motion provider order
+## Signal invoked when the player ends gliding
+signal player_glide_end
+
+## Movement provider order
 export var order := 30
 
 ## Controller separation distance to register as glide
 export var glide_detect_distance := 1.0
 
 ## Glide falling speed
-export var glide_fall_speed := -1
+export var glide_fall_speed := -1.0
 
 ## Glide forward speed
 export var glide_forward_speed := 10.0
@@ -49,8 +52,11 @@ export (NodePath) var left_controller = null
 export (NodePath) var right_controller = null
 
 # Node references
-var _left_controller_node : ARVRController = null
-var _right_controller_node : ARVRController = null
+var _left_controller_node: ARVRController = null
+var _right_controller_node: ARVRController = null
+
+# Is the player gliding
+var is_gliding := false
 
 # Horizontal vector (multiply by this to get only the horizontal components
 const horizontal := Vector3(1.0, 0.0, 1.0)
@@ -62,32 +68,45 @@ func _ready():
 	_right_controller_node = get_node(right_controller) if right_controller else get_node("../RightHandController")
 
 func physics_movement(delta: float, player_body: PlayerBody):
-	# Skip if not enabled or the player is on the ground
-	if !enabled or player_body.on_ground:
-		return
-
 	# Skip if either controller is off
 	if !_left_controller_node.get_is_active() or !_right_controller_node.get_is_active():
 		return
 
-	# Detect if gliding
-	var left_position = _left_controller_node.global_transform.origin
-	var right_position = _right_controller_node.global_transform.origin
-	if left_position.distance_to(right_position) < glide_detect_distance:
+	# Get the controller left ands right global positions
+	var left_position := _left_controller_node.global_transform.origin
+	var right_position := _right_controller_node.global_transform.origin
+
+	# Update if the player is gliding
+	var old_is_gliding := is_gliding
+	if player_body.on_ground:
+		is_gliding = false
+	elif left_position.distance_to(right_position) < glide_detect_distance:
+		is_gliding = false
+	else:
+		is_gliding = true
+	
+	# Detect if we're not gliding
+	if !is_gliding:
+		if old_is_gliding:
+			emit_signal("player_glide_end")
 		return
 
+	# Report start of gliding
+	if !old_is_gliding:
+		emit_signal("player_glide_start")
+
 	# Lerp the vertical velocity to glide_fall_speed
-	var vertical_velocity = player_body.velocity.y
+	var vertical_velocity := player_body.velocity.y
 	vertical_velocity = lerp(vertical_velocity, glide_fall_speed, vertical_slew_rate * delta)
 
 	# Lerp the horizontal velocity towards forward_speed
-	var horizontal_velocity = player_body.velocity * horizontal
-	var dir_forward = -(player_body.camera_node.global_transform.basis.z * horizontal).normalized()
-	var forward_velocity = dir_forward * glide_forward_speed
+	var horizontal_velocity := player_body.velocity * horizontal
+	var dir_forward := -(player_body.camera_node.global_transform.basis.z * horizontal).normalized()
+	var forward_velocity := dir_forward * glide_forward_speed
 	horizontal_velocity = lerp(horizontal_velocity, forward_velocity, horizontal_slew_rate * delta)
 
 	# Perform the glide
-	var glide_velocity = horizontal_velocity + vertical_velocity * Vector3.UP
+	var glide_velocity := horizontal_velocity + vertical_velocity * Vector3.UP
 	player_body.velocity = player_body.kinematic_node.move_and_slide(glide_velocity)
 
 	# Report exclusive motion performed (to bypass gravity)
@@ -96,14 +115,14 @@ func physics_movement(delta: float, player_body: PlayerBody):
 # This method verifies the MovementProvider has a valid configuration.
 func _get_configuration_warning():
 	# Verify the left controller
-	var test_left_controller_node = get_node(left_controller) if left_controller else get_node("../LeftHandController")
+	var test_left_controller_node = get_node_or_null(left_controller) if left_controller else get_node_or_null("../LeftHandController")
 	if !test_left_controller_node or !test_left_controller_node is ARVRController:
-		return "Unable to find left ARVR Controller node"	
+		return "Unable to find left ARVR Controller node"
 
 	# Verify the right controller
-	var test_right_controller_node = get_node(right_controller) if right_controller else get_node("../RightHandController")
+	var test_right_controller_node = get_node_or_null(right_controller) if right_controller else get_node_or_null("../RightHandController")
 	if !test_right_controller_node or !test_right_controller_node is ARVRController:
-		return "Unable to find right ARVR Controller node"	
+		return "Unable to find right ARVR Controller node"
 
 	# Call base class
 	return ._get_configuration_warning()

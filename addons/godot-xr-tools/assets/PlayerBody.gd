@@ -7,7 +7,7 @@ extends Node
 ##
 ## @desc:
 ##     This script works with the PlayerBody asset to provide the player with
-##     a PhysicsBody. This PhysicsBody is a capsule tracking the players hear
+##     a PlayerBody. This PlayerBody is a capsule tracking the players hear
 ##     via the ARVRCamera node.
 ##
 ##     The PlayerBody can detect when the player is in the air, on the ground, 
@@ -20,20 +20,20 @@ extends Node
 ##     track any movement to the PlayerBody.
 ##
 
-## PhysicsBody enabled flag
+## PlayerBody enabled flag
 export var enabled := true setget set_enabled, get_enabled
 
 ## Player radius
 export var player_radius := 0.4
 
 ## Eyes forward offset from center of body in player_radius units
-export var eye_forward_offset = 0.66
+export (float, 0.0, 1.0) var eye_forward_offset := 0.66
 
 ## Ground drag factor
-export var drag_factor = 0.1
+export var drag_factor := 0.1
 
 ## Maximum slope that can be walked up
-export var max_slope := 45.0
+export (float, 0.0, 85.0) var max_slope := 45.0
 
 ## Force of gravity on the player
 export var gravity := -9.8
@@ -79,7 +79,7 @@ const horizontal := Vector3(1.0, 0.0, 1.0)
 
 # Class to sort movement providers by order
 class SortProviderByOrder:
-	static func sort_by_order(a, b):
+	static func sort_by_order(a, b) -> bool:
 		return true if a.order < b.order else false
 
 # Called when the node enters the scene tree for the first time.
@@ -123,7 +123,7 @@ func _physics_process(delta):
 	_update_ground_information()
 
 	# Get the player body location before movement occurs
-	var position_before_movement = kinematic_node.global_transform.origin
+	var position_before_movement := kinematic_node.global_transform.origin
 
 	# Run the movement providers in order. The providers can:
 	# - Move the kinematic node around (to move the player)
@@ -132,11 +132,12 @@ func _physics_process(delta):
 	# - Read and modify the ground-control velocity
 	# - Perform exclusive updating of the player (bypassing other movement providers)
 	ground_control_velocity = Vector2.ZERO
-	var exclusive = false
+	var exclusive := false
 	for p in _movement_providers:
-		if p.physics_movement(delta, self):
-			exclusive = true
-			break
+		if p.enabled:
+			if p.physics_movement(delta, self):
+				exclusive = true
+				break
 
 	# If no controller has performed an exclusive-update then apply gravity and
 	# perform any ground-control
@@ -145,13 +146,13 @@ func _physics_process(delta):
 		_apply_velocity_and_control()
 
 	# Apply the player-body movement to the ARVR origin
-	var movement = kinematic_node.global_transform.origin - position_before_movement
+	var movement := kinematic_node.global_transform.origin - position_before_movement
 	origin_node.global_transform.origin += movement
 
 # This method updates the body to match the player position
 func _update_body_under_camera():
 	# Calculate the player height based on the origin and camera position
-	var player_height = camera_node.transform.origin.y + player_radius
+	var player_height := camera_node.transform.origin.y + player_radius
 	if player_height < player_radius:
 		player_height = player_radius
 
@@ -161,14 +162,13 @@ func _update_body_under_camera():
 	_collision_node.transform.origin.y = (player_height / 2.0)
 
 	# Center the kinematic body on the ground under the camera
-	var curr_transform = kinematic_node.global_transform
-	var camera_transform = camera_node.global_transform
+	var curr_transform := kinematic_node.global_transform
+	var camera_transform := camera_node.global_transform
 	curr_transform.origin = camera_transform.origin
 	curr_transform.origin.y = origin_node.global_transform.origin.y
 
 	# The camera/eyes are towards the front of the body, so move the body back slightly
-	var forward_dir = -camera_transform.basis.z
-	forward_dir.y = 0.0
+	var forward_dir := -camera_transform.basis.z * horizontal
 	if forward_dir.length() > 0.01:
 		curr_transform.origin -= forward_dir.normalized() * eye_forward_offset * player_radius
 
@@ -178,7 +178,7 @@ func _update_body_under_camera():
 # This method updates the information about the ground under the players feet
 func _update_ground_information():
 	# Update the ground information
-	var ground_collision = $KinematicBody.move_and_collide(Vector3(0.0, -0.05, 0.0), true, true, true)
+	var ground_collision := kinematic_node.move_and_collide(Vector3(0.0, -0.05, 0.0), true, true, true)
 	if !ground_collision:
 		on_ground = false
 		ground_vector = Vector3.UP
@@ -186,17 +186,18 @@ func _update_ground_information():
 	else:
 		on_ground = true
 		ground_vector = ground_collision.normal
-		ground_angle = ground_collision.get_angle() * 57.2957795131
+		ground_angle = rad2deg(ground_collision.get_angle())
 
 		# Detect if we're sliding on a wall
+		# TODO: consider reworking this magic angle
 		if ground_angle > 85:
 			on_ground = false
 
 # This method applies the player velocity and ground-control velocity to the physical body
 func _apply_velocity_and_control():
 	# Split the velocity into horizontal and vertical components
-	var horizontal_velocity = velocity * horizontal
-	var vertical_velocity = velocity * Vector3.UP
+	var horizontal_velocity := velocity * horizontal
+	var vertical_velocity := velocity * Vector3.UP
 
 	# If the player is on the ground then give them control
 	if on_ground:
@@ -205,15 +206,15 @@ func _apply_velocity_and_control():
 
 		# If ground control is being supplied then update the horizontal velocity
 		if abs(ground_control_velocity.x) > 0.1 or abs(ground_control_velocity.y) > 0.1:
-			var camera_transform = camera_node.global_transform
-			var dir_forward = (camera_transform.basis.z * horizontal).normalized()
-			var dir_right = (camera_transform.basis.x * horizontal).normalized()
+			var camera_transform := camera_node.global_transform
+			var dir_forward := (camera_transform.basis.z * horizontal).normalized()
+			var dir_right := (camera_transform.basis.x * horizontal).normalized()
 			horizontal_velocity = (dir_forward * -ground_control_velocity.y + dir_right * ground_control_velocity.x) * ARVRServer.world_scale
 
 		# Prevent the player from moving up steep slopes
 		if ground_angle > max_slope:
 			# Get a vector in the down-hill direction
-			var down_direction = ground_vector * horizontal
+			var down_direction := ground_vector * horizontal
 			var vdot = down_direction.dot(horizontal_velocity)
 			if vdot < 0:
 				horizontal_velocity -= down_direction * vdot
@@ -235,12 +236,12 @@ func _apply_velocity_and_control():
 # - Maximum slope is valid
 func _get_configuration_warning():
 	# Check the origin node
-	var test_origin_node = get_node(origin) if origin else get_parent()
+	var test_origin_node = get_node_or_null(origin) if origin else get_parent()
 	if !test_origin_node or !test_origin_node is ARVROrigin:
 		return "Unable to find ARVR Origin node"
 
 	# Check the camera node
-	var test_camera_node = get_node(camera) if camera else test_origin_node.get_node("ARVRCamera")
+	var test_camera_node = get_node_or_null(camera) if camera else test_origin_node.get_node("ARVRCamera")
 	if !test_camera_node or !test_camera_node is ARVRCamera:
 		return "Unable to find ARVR Camera node"
 
@@ -253,8 +254,8 @@ func _get_configuration_warning():
 		return "Player eye forward offset invalid [0..1]"
 
 	# Verify the player radius is valid
-	if max_slope <= 0 || max_slope >= 90:
-		return "Invalid maximum slope (0..90)"
+	if max_slope <= 0 || max_slope >= 85:
+		return "Invalid maximum slope (0..85)"
 
 	# Verify eye-forward does not allow near-clip-plane look through
 	var eyes_to_collider = (1.0 - eye_forward_offset) * player_radius

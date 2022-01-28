@@ -37,10 +37,7 @@ enum Buttons {
 ## Player jumped signal
 signal player_jumped
 
-## Enable jump movement
-export var enabled := true
-
-## Motion provider order
+## Movement provider order
 export var order := 20
 
 ## Button to trigger jump
@@ -53,7 +50,7 @@ export var jump_velocity := 3.0
 export (NodePath) var controller = null
 
 # Node references
-var _controller_node : ARVRController = null
+var _controller_node: ARVRController = null
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -62,8 +59,8 @@ func _ready():
 
 # Perform jump movement
 func physics_movement(delta: float, player_body: PlayerBody):
-	# Skip if not enabled or the player isn't on the ground
-	if !enabled or !player_body.on_ground:
+	# Skip if the player isn't on the ground
+	if !player_body.on_ground:
 		return
 
 	# Skip if the jump controller isn't active
@@ -81,7 +78,7 @@ func physics_movement(delta: float, player_body: PlayerBody):
 # This method verifies the MovementProvider has a valid configuration.
 func _get_configuration_warning():
 	# Check the controller node
-	var test_controller_node = get_node(controller) if controller else get_parent()
+	var test_controller_node = get_node_or_null(controller) if controller else get_parent()
 	if !test_controller_node or !test_controller_node is ARVRController:
 		return "Unable to find ARVR Controller node"
 

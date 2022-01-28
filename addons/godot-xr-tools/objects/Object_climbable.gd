@@ -10,10 +10,10 @@ extends StaticBody
 ##     For climbing to work, the player must have a Function_Climb_movement.
 ##
 
-var press_to_hold = true
+var press_to_hold := true
 
-# Dictionary of grab locations by pickup instance id
-var grab_locations = {}
+## Dictionary of grab locations by pickup
+var grab_locations := {}
 
 # Called by Function_pickup
 func is_picked_up():
@@ -39,10 +39,10 @@ func pick_up(by: Function_Pickup, with_controller: ARVRController):
 func let_go(p_linear_velocity: Vector3, p_angular_velocity: Vector3):
 	pass
 
-# Save the grab world-location
+# Save the grab location
 func save_grab_location(p: Function_Pickup):
-	grab_locations[p.get_instance_id()] = p.global_transform.origin
+	grab_locations[p.get_instance_id()] = to_local(p.global_transform.origin)
 
-# Get the grab world-location
+# Get the grab location in world-space
 func get_grab_location(p: Function_Pickup) -> Vector3:
-	return grab_locations[p.get_instance_id()]
+	return to_global(grab_locations[p.get_instance_id()])
