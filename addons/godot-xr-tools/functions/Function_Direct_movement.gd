@@ -7,7 +7,7 @@ extends MovementProvider
 ##
 ## @desc:
 ##     This script works with the Function_Direct_movement asset to provide
-##     direct movement for the player. This script works with the PhysicsBody
+##     direct movement for the player. This script works with the PlayerBody
 ##     attached to the players ARVROrigin.
 ##
 ##     The following types of direct movement are supported:

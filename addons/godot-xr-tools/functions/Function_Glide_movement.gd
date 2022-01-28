@@ -7,7 +7,7 @@ extends MovementProvider
 ##
 ## @desc:
 ##     This script works with the Function_Glide_movement asset to provide glide
-##     mechanics for the player. This script works with the PhysicsBody attached
+##     mechanics for the player. This script works with the PlayerBody attached
 ##     to the players ARVROrigin.
 ##
 ##     The player enables flying by moving the controllers apart further than
@@ -37,7 +37,10 @@ export var glide_fall_speed := -1
 export var glide_forward_speed := 10.0
 
 ## Slew rate to transition to gliding
-export var slew_rate := 4.0
+export var horizontal_slew_rate := 1.0
+
+## Slew rate to transition to gliding
+export var vertical_slew_rate := 4.0
 
 ## Left ARVR Controller
 export (NodePath) var left_controller = null
@@ -75,13 +78,13 @@ func physics_movement(delta: float, player_body: PlayerBody):
 
 	# Lerp the vertical velocity to glide_fall_speed
 	var vertical_velocity = player_body.velocity.y
-	vertical_velocity = lerp(vertical_velocity, glide_fall_speed, slew_rate * delta)
+	vertical_velocity = lerp(vertical_velocity, glide_fall_speed, vertical_slew_rate * delta)
 
 	# Lerp the horizontal velocity towards forward_speed
 	var horizontal_velocity = player_body.velocity * horizontal
 	var dir_forward = -(player_body.camera_node.global_transform.basis.z * horizontal).normalized()
 	var forward_velocity = dir_forward * glide_forward_speed
-	horizontal_velocity = lerp(horizontal_velocity, forward_velocity, slew_rate * delta)
+	horizontal_velocity = lerp(horizontal_velocity, forward_velocity, horizontal_slew_rate * delta)
 
 	# Perform the glide
 	var glide_velocity = horizontal_velocity + vertical_velocity * Vector3.UP

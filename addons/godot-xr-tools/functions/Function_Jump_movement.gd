@@ -7,7 +7,7 @@ extends MovementProvider
 ##
 ## @desc:
 ##     This script works with the Function_Jump_movement asset to provide 
-##     jumping mechanics for the player. This script works with the PhysicsBody
+##     jumping mechanics for the player. This script works with the PlayerBody
 ##     attached to the players ARVROrigin.
 ##
 ##     The player enables jumping by attaching a Function_Jump_movement as a 

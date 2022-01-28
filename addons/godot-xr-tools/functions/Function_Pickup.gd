@@ -1,3 +1,4 @@
+class_name Function_Pickup
 extends Area
 
 signal has_picked_up(what)

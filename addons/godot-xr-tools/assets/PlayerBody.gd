@@ -26,6 +26,9 @@ export var enabled := true setget set_enabled, get_enabled
 ## Player radius
 export var player_radius := 0.4
 
+## Eyes forward offset from center of body in player_radius units
+export var eye_forward_offset = 0.66
+
 ## Ground drag factor
 export var drag_factor = 0.1
 
@@ -167,7 +170,7 @@ func _update_body_under_camera():
 	var forward_dir = -camera_transform.basis.z
 	forward_dir.y = 0.0
 	if forward_dir.length() > 0.01:
-		curr_transform.origin += forward_dir.normalized() * -0.66 * player_radius
+		curr_transform.origin -= forward_dir.normalized() * eye_forward_offset * player_radius
 
 	# Set the body position
 	kinematic_node.global_transform = curr_transform
@@ -245,9 +248,18 @@ func _get_configuration_warning():
 	if player_radius <= 0:
 		return "Player radius must be configured"
 
+	# Verify eye forwards range
+	if eye_forward_offset < 0 || eye_forward_offset > 1:
+		return "Player eye forward offset invalid [0..1]"
+
 	# Verify the player radius is valid
 	if max_slope <= 0 || max_slope >= 90:
 		return "Invalid maximum slope (0..90)"
+
+	# Verify eye-forward does not allow near-clip-plane look through
+	var eyes_to_collider = (1.0 - eye_forward_offset) * player_radius
+	if eyes_to_collider < test_camera_node.near:
+		return "Eyes too far forwards. Move eyes back or decrease camera near clipping plane"
 
 	# Passed basic validation
 	return ""
