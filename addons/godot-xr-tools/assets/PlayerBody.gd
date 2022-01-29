@@ -38,6 +38,9 @@ export (float, 0.0, 85.0) var max_slope := 45.0
 ## Force of gravity on the player
 export var gravity := -9.8
 
+## Lets the player push rigid bodies
+export var push_rigid_bodies := true
+
 ## Path to the ARVROrigin node
 export (NodePath) var origin = null
 
@@ -149,6 +152,10 @@ func _physics_process(delta):
 	var movement := kinematic_node.global_transform.origin - position_before_movement
 	origin_node.global_transform.origin += movement
 
+# Perform a move_and_slide on the kinematic node
+func move_and_slide(var velocity: Vector3) -> Vector3:
+	return kinematic_node.move_and_slide(velocity, Vector3.UP, false, 4, 0.785398, push_rigid_bodies)
+	
 # This method updates the body to match the player position
 func _update_body_under_camera():
 	# Calculate the player height based on the origin and camera position
@@ -220,8 +227,8 @@ func _apply_velocity_and_control():
 				horizontal_velocity -= down_direction * vdot
 
 	# Apply the horizontal and vertical velocities to the player body
-	horizontal_velocity = kinematic_node.move_and_slide(horizontal_velocity, Vector3(0.0, 1.0, 0.0))
-	vertical_velocity = kinematic_node.move_and_slide(vertical_velocity, Vector3(0.0, 1.0, 0.0))
+	horizontal_velocity = move_and_slide(horizontal_velocity)
+	vertical_velocity = move_and_slide(vertical_velocity)
 
 	# Update the players velocity
 	velocity.x = horizontal_velocity.x

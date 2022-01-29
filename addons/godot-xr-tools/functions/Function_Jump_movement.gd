@@ -43,6 +43,9 @@ export var order := 20
 ## Button to trigger jump
 export (Buttons) var jump_button_id = Buttons.VR_TRIGGER
 
+## Maximum slope that can be jumped on
+export (float, 0.0, 85.0) var max_slope := 45.0
+
 ## Jump vertical velocity
 export var jump_velocity := 3.0
 
@@ -59,8 +62,8 @@ func _ready():
 
 # Perform jump movement
 func physics_movement(delta: float, player_body: PlayerBody):
-	# Skip if the player isn't on the ground
-	if !player_body.on_ground:
+	# Skip if the player isn't on flat ground
+	if !player_body.on_ground || player_body.ground_angle > max_slope:
 		return
 
 	# Skip if the jump controller isn't active

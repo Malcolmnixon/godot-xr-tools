@@ -107,7 +107,7 @@ func physics_movement(delta: float, player_body: PlayerBody):
 			# Use the controller's transform to move the VR capsule follow its orientation
 			var curr_transform := player_body.kinematic_node.global_transform
 			var fly_velocity := -_controller_node.global_transform.basis.z.normalized() * max_speed * ARVRServer.world_scale
-			player_body.velocity = player_body.kinematic_node.move_and_slide(fly_velocity)
+			player_body.velocity = player_body.move_and_slide(fly_velocity)
 		else:
 			player_body.velocity = Vector3.ZERO
 
