@@ -94,11 +94,43 @@ class SortProviderByOrder:
 	static func sort_by_order(a, b) -> bool:
 		return true if a.order < b.order else false
 
+# Get our origin node, make sure we have consistent code here
+func _get_origin_node() -> ARVROrigin:
+	var node : ARVROrigin = get_node_or_null(origin) if origin else get_parent()
+	return node
+
+# Get our camera node
+func _get_camera_node() -> ARVRCamera:
+	# if we have set a node, try and use it
+	var node : ARVRCamera
+	
+	if camera:
+		node = get_node_or_null(camera)
+		if node:
+			return node
+
+	var o : ARVROrigin = _get_origin_node()
+	if !o:
+		return null
+
+	# else get by default name 
+	node = o.get_node_or_null("ARVRCamera")
+	if node:
+		return node
+
+	# else find the first camera child
+	for child in o.get_children():
+		if child is ARVRCamera:
+			return child
+
+	# no luck
+	return null
+
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	# Get the origin and camera nodes
-	origin_node = get_node(origin) if origin else get_parent()
-	camera_node = get_node(camera) if camera else origin_node.get_node("ARVRCamera")
+	origin_node = _get_origin_node()
+	camera_node = _get_camera_node()
 
 	# Get the movement providers ordered by increasing order
 	_movement_providers = get_tree().get_nodes_in_group("movement_providers")
@@ -264,12 +296,12 @@ func _apply_velocity_and_control(delta: float):
 # - Maximum slope is valid
 func _get_configuration_warning():
 	# Check the origin node
-	var test_origin_node = get_node_or_null(origin) if origin else get_parent()
+	var test_origin_node = _get_origin_node()
 	if !test_origin_node or !test_origin_node is ARVROrigin:
 		return "Unable to find ARVR Origin node"
 
 	# Check the camera node
-	var test_camera_node = get_node_or_null(camera) if camera else test_origin_node.get_node("ARVRCamera")
+	var test_camera_node = _get_camera_node()
 	if !test_camera_node or !test_camera_node is ARVRCamera:
 		return "Unable to find ARVR Camera node"
 
