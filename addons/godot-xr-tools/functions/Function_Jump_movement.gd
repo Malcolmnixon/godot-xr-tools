@@ -62,8 +62,8 @@ func _ready():
 
 # Perform jump movement
 func physics_movement(delta: float, player_body: PlayerBody):
-	# Skip if the player isn't on flat ground
-	if !player_body.on_ground || player_body.ground_angle > max_slope:
+	# Skip if the player isn't on the ground
+	if !player_body.on_ground:
 		return
 
 	# Skip if the jump controller isn't active
@@ -74,9 +74,15 @@ func physics_movement(delta: float, player_body: PlayerBody):
 	if !_controller_node.is_button_pressed(jump_button_id):
 		return
 
+	# Skip if the ground is too steep to jump
+	var current_max_slope := GroundPhysics.get_jump_max_slope(player_body.ground_physics, max_slope)
+	if player_body.ground_angle > current_max_slope:
+		return
+
 	# Perform the jump
 	emit_signal("player_jumped")
-	player_body.velocity.y = jump_velocity * ARVRServer.world_scale
+	var current_jump_velocity := GroundPhysics.get_jump_velocity(player_body.ground_physics, jump_velocity)
+	player_body.velocity.y = current_jump_velocity * ARVRServer.world_scale
 
 # This method verifies the MovementProvider has a valid configuration.
 func _get_configuration_warning():

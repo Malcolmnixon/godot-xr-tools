@@ -65,12 +65,12 @@ func _ready():
 func physics_movement(delta: float, player_body: PlayerBody):
 	# Get the left-hand climbable
 	var left_climbable = _left_pickup_node.picked_up_object
-	if left_climbable and !left_climbable is Object_climbable:
+	if !is_instance_valid(left_climbable) or !left_climbable is Object_climbable:
 		left_climbable = null
 
 	# Get the right-hand climbable
-	var right_climbable = _right_pickup_node.picked_up_object
-	if right_climbable and !right_climbable is Object_climbable:
+	var right_climbable : Node = _right_pickup_node.picked_up_object
+	if !is_instance_valid(right_climbable) or !right_climbable is Object_climbable:
 		right_climbable = null
 
 	# Detect if we are climbing now
@@ -107,6 +107,7 @@ func physics_movement(delta: float, player_body: PlayerBody):
 	# Move the player by the offset
 	var old_position := player_body.kinematic_node.global_transform.origin
 	player_body.kinematic_node.move_and_collide(-offset)
+	player_body.velocity = Vector3.ZERO
 
 	# Update the players average-velocity data
 	var distance := player_body.kinematic_node.global_transform.origin - old_position

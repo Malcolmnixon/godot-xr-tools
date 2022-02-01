@@ -33,17 +33,20 @@ export var order := 30
 ## Controller separation distance to register as glide
 export var glide_detect_distance := 1.0
 
+## Minimum falling speed to be considered gliding
+export var glide_min_fall_speed = -1.5
+
 ## Glide falling speed
-export var glide_fall_speed := -1.0
+export var glide_fall_speed := -2.0
 
 ## Glide forward speed
-export var glide_forward_speed := 10.0
+export var glide_forward_speed := 8.0
 
 ## Slew rate to transition to gliding
 export var horizontal_slew_rate := 1.0
 
 ## Slew rate to transition to gliding
-export var vertical_slew_rate := 4.0
+export var vertical_slew_rate := 2.0
 
 ## Left ARVR Controller
 export (NodePath) var left_controller = null
@@ -72,28 +75,20 @@ func physics_movement(delta: float, player_body: PlayerBody):
 	if !_left_controller_node.get_is_active() or !_right_controller_node.get_is_active():
 		return
 
-	# Get the controller left ands right global positions
-	var left_position := _left_controller_node.global_transform.origin
-	var right_position := _right_controller_node.global_transform.origin
-
-	# Update if the player is gliding
-	var old_is_gliding := is_gliding
-	if player_body.on_ground:
-		is_gliding = false
-	elif left_position.distance_to(right_position) < glide_detect_distance:
-		is_gliding = false
-	else:
-		is_gliding = true
-	
-	# Detect if we're not gliding
-	if !is_gliding:
-		if old_is_gliding:
-			emit_signal("player_glide_end")
+	# If on the ground, or not falling, then not gliding
+	if player_body.on_ground || player_body.velocity.y >= glide_min_fall_speed:
+		_set_is_gliding(false)
 		return
 
-	# Report start of gliding
-	if !old_is_gliding:
-		emit_signal("player_glide_start")
+	# Get the controller left ands right global horizontal positions
+	var left_position := _left_controller_node.global_transform.origin * horizontal
+	var right_position := _right_controller_node.global_transform.origin * horizontal
+	var left_to_right := right_position - left_position
+
+	# If the hands are too close then not gliding
+	if left_to_right.length() < glide_detect_distance:
+		_set_is_gliding(false)
+		return
 
 	# Lerp the vertical velocity to glide_fall_speed
 	var vertical_velocity := player_body.velocity.y
@@ -101,7 +96,7 @@ func physics_movement(delta: float, player_body: PlayerBody):
 
 	# Lerp the horizontal velocity towards forward_speed
 	var horizontal_velocity := player_body.velocity * horizontal
-	var dir_forward := -(player_body.camera_node.global_transform.basis.z * horizontal).normalized()
+	var dir_forward := left_to_right.rotated(Vector3.UP, PI/2).normalized()
 	var forward_velocity := dir_forward * glide_forward_speed
 	horizontal_velocity = lerp(horizontal_velocity, forward_velocity, horizontal_slew_rate * delta)
 
@@ -111,6 +106,21 @@ func physics_movement(delta: float, player_body: PlayerBody):
 
 	# Report exclusive motion performed (to bypass gravity)
 	return true
+
+# Set the is_gliding flag and fire any signals
+func _set_is_gliding(gliding: bool):
+	# Skip if no change
+	if gliding == is_gliding:
+		return
+
+	# Update the is_gliding flag
+	is_gliding = gliding;
+	
+	# Report transition
+	if is_gliding:
+		emit_signal("player_glide_start")
+	else:
+		emit_signal("player_glide_end")
 
 # This method verifies the MovementProvider has a valid configuration.
 func _get_configuration_warning():
@@ -123,6 +133,10 @@ func _get_configuration_warning():
 	var test_right_controller_node = get_node_or_null(right_controller) if right_controller else get_node_or_null("../RightHandController")
 	if !test_right_controller_node or !test_right_controller_node is ARVRController:
 		return "Unable to find right ARVR Controller node"
+
+	# Check glide parameters
+	if glide_min_fall_speed >= glide_fall_speed:
+		return "Glide fall speed must be faster than minimum fall speed"
 
 	# Call base class
 	return ._get_configuration_warning()

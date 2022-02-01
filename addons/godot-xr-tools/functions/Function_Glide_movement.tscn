@@ -4,3 +4,5 @@
 
 [node name="Function_Glide_movement" type="Node" groups=["movement_providers"]]
 script = ExtResource( 1 )
+left_controller = null
+right_controller = null

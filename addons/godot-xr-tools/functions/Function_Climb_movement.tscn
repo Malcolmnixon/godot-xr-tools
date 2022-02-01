@@ -4,3 +4,5 @@
 
 [node name="Function_Climb_movement" type="Node" groups=["movement_providers"]]
 script = ExtResource( 1 )
+left_pickup = null
+right_pickup = null

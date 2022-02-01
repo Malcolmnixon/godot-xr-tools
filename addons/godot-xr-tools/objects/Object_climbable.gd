@@ -1,5 +1,5 @@
 class_name Object_climbable
-extends StaticBody
+extends Spatial
 
 ##
 ## Climbable Object
