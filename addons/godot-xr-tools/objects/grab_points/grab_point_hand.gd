@@ -43,11 +43,23 @@ const RIGHT_HAND_PATH := "res://addons/godot-xr-tools/hands/scenes/lowpoly/right
 ## Hand grab mode
 @export var mode : Mode = Mode.GENERAL
 
+## Snap the hand mesh to the grab-point
+@export var snap_hand : bool = true
+
 ## Hand pose
 @export var hand_pose : XRToolsHandPoseSettings: set = _set_hand_pose
 
 ## If true, the hand is shown in the editor
 @export var editor_preview_mode : PreviewMode = PreviewMode.CLOSED: set = _set_editor_preview_mode
+
+## How much this grab-point drives the position
+@export var drive_position : float = 1.0
+
+## How much this grab-point drives the angle
+@export var drive_angle : float = 1.0
+
+## How much this grab-point drives the aim
+@export var drive_aim : float = 0.0
 
 
 ## Hand to use for editor preview
